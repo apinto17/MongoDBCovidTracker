@@ -1,7 +1,7 @@
 import json
 import csv
 import requests
-
+from pymongo import MongoClient
 
 def main():
     stateDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
@@ -15,12 +15,14 @@ def main():
 #authenticate MongoDB using credentials in credentials.json
 def authenticate(credentialFile):
     with open(credentialFile) as f:
-        jsonData = json.loads(f.readlines())
+        jsonData = json.loads("\n".join(f.readlines()))
+        username = jsonData['username']
+        password = jsonData['password']
     
 #get the task configuration from trackConfig.json
 def configure(configFile):
     with open(configFile) as f:
-        jsonData = json.loads(f.readlines())
+        jsonData = json.loads("\n".join(f.readlines()))
     return jsonData
 
 #updates local files with data from APIs
