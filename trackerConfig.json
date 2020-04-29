@@ -1,0 +1,7 @@
+{"refresh" : true, 
+"collection" : "covid",
+"aggregation" : "usa",
+"time" : "today",
+"target" : "CA",
+"counties" : "Ventura",
+"analysis" :{"task" : {"track": "positive"}, "output" : "april27.html"}}

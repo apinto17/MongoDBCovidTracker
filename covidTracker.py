@@ -9,7 +9,13 @@ def main():
     updateFiles(stateDataURL, countyDataURL)
 
 
+    
 
+
+
+
+
+#updates local files with data from APIs
 def updateFiles(state, county):
     r = requests.get(state)
     with open('daily.json','w') as f:
@@ -18,7 +24,6 @@ def updateFiles(state, county):
     with open('us-counties.csv','w') as f:
         f.write(r.text)
     print("Local Files Updated")    
-
 
 
 
