@@ -3,6 +3,7 @@ import csv
 import requests
 from pymongo import MongoClient
 import pprint
+from bson.son import SON
 
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
@@ -12,9 +13,14 @@ def main():
     db = getDB(credsFile)
     updateDB(db,covidDataURL, statesDataURL)
     config = configure(configFile)
-    covidColl = db['covid']
-    pprint.pprint(covidColl.find_one())
+    covid = db['covid']
+    pipeline = [{"$match": {"state": "CA"}},
+                {"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},
+                {"$project": {"_id":0, "positive":1, "date":1}},
+                {"$sort": {"date":1}}]
+    pprint.pprint(list(db.covid.aggregate(pipeline)))
 
+#updates db collections with data from APIs
 def updateDB(db, covidDataURL, statesDataURL):
     covidStr = requests.get(covidDataURL).text
     statesCSV = requests.get(statesDataURL).text
