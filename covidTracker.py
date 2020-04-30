@@ -28,15 +28,12 @@ def updateDB(db, covidDataURL, statesDataURL):
 def csv2json(csv):
     newLis = []
     header = csv.split("\n")[0].split(",")
-    for line in csv.split("\n"):
+    for line in csv.split("\n")[1:]:
         line = line.split(",")
-        if line == header:
-            pass
-        else:
-            dic = {}
-            for item in range(len(header)):
-                dic[header[item]] = line[item]
-            newLis.append(dic)  
+        dic = {}
+        for item in range(len(header)):
+            dic[header[item]] = line[item]
+        newLis.append(dic)  
     return(newLis)
 
 #authenticate MongoDB using credentials in credentials.json and return Client
