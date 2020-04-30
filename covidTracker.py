@@ -13,12 +13,24 @@ def main():
     db = getDB(credsFile)
     updateDB(db,covidDataURL, statesDataURL)
     config = configure(configFile)
+    pipeline = generate_pipeline(config)
     covid = db['covid']
-    pipeline = [{"$match": {"state": "CA"}},
-                {"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},
-                {"$project": {"_id":0, "positive":1, "date":1}},
-                {"$sort": {"date":1}}]
     pprint.pprint(list(db.covid.aggregate(pipeline)))
+
+
+#this is real the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
+def generate_pipeline(config):
+    pipeline = []
+    #example pipeline to make sure everything is working
+    #pipeline = [{"$match": {"state": "CA"}},
+    #            {"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},
+    #            {"$project": {"_id":0, "positive":1, "date":1}},
+    #            {"$sort": {"date":1}}]
+    return pipeline
+
+    
+
+
 
 #updates db collections with data from APIs
 def updateDB(db, covidDataURL, statesDataURL):
@@ -76,8 +88,6 @@ def updateFiles(state, county):
     with open('us-counties.csv','w') as f:
         f.write(r.text)
     print("Local Files Updated")    
-
-
 
 if __name__ == "__main__":
     main()                
