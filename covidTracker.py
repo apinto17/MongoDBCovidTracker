@@ -21,6 +21,7 @@ def main():
 #this is real the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
     pipeline = []
+    pipeline = [interpret_collection(config["collection"]) + interpret_time(config["time"]) + interpret_target(config["target"]) + interpret_counties(config["counties"]) + interpret_analysis(config["analysis"])]
     #example pipeline to make sure everything is working
     #pipeline = [{"$match": {"state": "CA"}},
     #            {"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},
@@ -28,7 +29,24 @@ def generate_pipeline(config):
     #            {"$sort": {"date":1}}]
     return pipeline
 
-    
+
+#each needs to take in the parameter from the config file, and return the appropriate monogDB query.
+#example output for one of the functions would be "{"$match": {"state": "CA"}}" 
+def interpret_collection(collection):
+    pass
+
+def interpret_time(time):
+    pass
+
+def interpret_target(target):
+    pass
+
+
+def interpret_counties(counties):
+    pass
+
+def interpret_analysis(analysis):
+    pass
 
 
 
