@@ -6,22 +6,23 @@ import pprint
 from bson.son import SON
 
 def main():
-    covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
-    statesDataURL = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
-    credsFile = 'credentials.json'
+    # covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
+    # statesDataURL = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
+    # credsFile = 'credentials.json'
     configFile = 'trackerConfig.json'
-    db = getDB(credsFile)
-    updateDB(db,covidDataURL, statesDataURL)
+    # db = getDB(credsFile)
+    # updateDB(db,covidDataURL, statesDataURL)
     config = configure(configFile)
     pipeline = generate_pipeline(config)
-    covid = db['covid']
-    pprint.pprint(list(db.covid.aggregate(pipeline)))
+    print(pipeline)
+    # covid = db['covid']
+    # pprint.pprint(list(db.covid.aggregate(pipeline)))
 
 
 #this is real the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
     pipeline = []
-    pipeline = [interpret_collection(config["collection"]) + interpret_time(config["time"]) + interpret_target(config["target"]) + interpret_counties(config["counties"]) + interpret_analysis(config["analysis"])]
+    pipeline = [interpret_counties(config)]
     #example pipeline to make sure everything is working
     #pipeline = [{"$match": {"state": "CA"}},
     #            {"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},
@@ -42,8 +43,15 @@ def interpret_target(target):
     pass
 
 
-def interpret_counties(counties):
-    pass
+def interpret_counties(config):
+    if(config["collection"] == "states"):
+        counties = config["counties"]
+        if(type(counties) is list):
+            return {"$match": {"county": {"$in": counties }}} 
+        else:
+            return {"$match": {"county": counties}}
+    else:
+        return ""
 
 def interpret_analysis(analysis):
     pass

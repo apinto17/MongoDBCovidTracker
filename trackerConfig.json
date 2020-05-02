@@ -1,7 +1,7 @@
 {"refresh" : true, 
-"collection" : "covid",
-"aggregation" : "usa",
+"collection" : "states",
+"aggregation" : "state",
 "time" : "today",
 "target" : "CA",
-"counties" : "Ventura",
+"counties" : ["Ventura", "Contra Costa"],
 "analysis" :{"task" : {"track": "positive"}, "output" : "april27.html"}}
