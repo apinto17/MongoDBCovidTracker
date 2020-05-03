@@ -21,7 +21,7 @@ def main():
     else:
         pprint.pprint(list(db.covid.aggregate(pipeline)))
         
-#this is real the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
+#this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
     pipeline = []
     pipeline = [interpret_counties(config) , interpret_time(config)]
@@ -32,8 +32,6 @@ def generate_pipeline(config):
 
 #each needs to take in the parameter from the config file, and return the appropriate monogDB query.
 #example output for one of the functions would be "{"$match": {"state": "CA"}}" 
-def interpret_collection(collection):
-    pass
 
 def interpret_time(config):
     time = config['time']
@@ -56,10 +54,31 @@ def interpret_time(config):
     return pipe  
 
 
-    
+def interpret_aggregate(config):
+    fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+    track = "$" + config['analysis']['task']['track']
+    pipe = ""
+    if level == 'usa':
+        pipe = {"$group":{"_id":"$date", "positive":{"$sum":track}}}
+    elif level == 'fiftyStates': 
+        pipe = {"$group":{"_id":"$date", "positive":{"$sum":track}}}
+    elif level == 'state': 
+        pass
+    elif level == 'county': 
+        pass
+    return pipe
 
-def interpret_target(target):
-    pass
+def interpret_target(config):
+    pipe = ""
+    states = config["target"]
+    if(config["collection"] == "states"):
+        pipe = {"$match": {"state": states}}
+    else:
+        if(type(states) is list):
+            pipe = {"$match": {"state": {"$in": states}}} 
+        else:
+            pipe = {"$match": {"state": state}}
+    return pipe
 
 
 def interpret_counties(config):
@@ -79,7 +98,8 @@ def interpret_analysis(analysis):
 
 #updates db collections with data from APIs
 def refresh(refresh_bool, db, covidDataURL, statesDataURL):
-    if refresh_bool:
+    collections = db.list_collection_names()
+    if refresh_bool or (not 'states' in collections) or (not 'covid' in collections):
         covidStr = requests.get(covidDataURL).text
         statesCSV = requests.get(statesDataURL).text
         covid = json.loads(covidStr)
