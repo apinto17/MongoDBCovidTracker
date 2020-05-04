@@ -25,6 +25,12 @@ def main():
 def generate_pipeline(config):
     pipeline = []
     pipeline = [interpret_counties(config) , interpret_time(config)]
+    if config['aggregation'] == 'fiftyStates':
+        fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+        pipeline.append({"$match": {"state": {"$in": fifty_states}}})
+    pipeline.append(interpret_counties(config)) 
+    pipeline.append(interpret_time(config))
+    pipeline.append(interpret_aggregate(config))
     #example pipeline to make sure everything is working
     #pipeline = [{"$match": {"state": "CA"}},{"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},{"$project": {"_id":0, "positive":1, "date":1}},{"$sort": {"date":1}}]
     return pipeline
@@ -55,17 +61,15 @@ def interpret_time(config):
 
 
 def interpret_aggregate(config):
-    fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-    track = "$" + config['analysis']['task']['track']
+    track = config['analysis']['task']['track']
     pipe = ""
-    if level == 'usa':
-        pipe = {"$group":{"_id":"$date", "positive":{"$sum":track}}}
-    elif level == 'fiftyStates': 
-        pipe = {"$group":{"_id":"$date", "positive":{"$sum":track}}}
+    level = config['aggregation']
+    if level == 'fiftyStates' or level == 'usa': 
+        pipe = {"$group":{"_id":"$date", track:{"$sum":"$" + track}}}
     elif level == 'state': 
-        pass
+        pipe = {"$group":{"_id":"$state", track:{"$sum":"$" + track}}}
     elif level == 'county': 
-        pass
+        pipe = {"$group":{"_id":"$county", track:{"$sum":"$" + track}}}
     return pipe
 
 def interpret_target(config):
