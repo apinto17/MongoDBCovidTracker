@@ -5,6 +5,7 @@ from pymongo import MongoClient
 import pprint
 from bson.son import SON
 from datetime import date, timedelta
+import matplotlib.pyplot as plt
 
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
@@ -92,12 +93,20 @@ def interpret_counties(config):
             return {"$match": {"county": {"$in": counties }}} 
         else:
             return {"$match": {"county": counties}}
+        
     else:
         return ""
 
-def interpret_analysis(analysis):
-    pass
-
+def interpret_output(config):
+    for task in config["analysis"]:
+        if("graph" in task["output"].keys()):
+            graph = task["output"]["graph"]
+            if(graph["type"] == "bar"):
+                plt.bar()
+            elif(graph["type"] == "line"):
+                plt.plot()
+            elif(graph["type"] == "scatter"):
+                plt.scatter()
 
 
 #updates db collections with data from APIs
