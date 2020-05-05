@@ -14,26 +14,33 @@ def main():
     config = configure(configFile)
     db = getDB(credsFile)
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    pipeline = generate_pipeline(config)
-    print(pipeline)
-    if config['collection'] == 'states':
-        pprint.pprint(list(db.states.aggregate(pipeline)))
-    else:
-        pprint.pprint(list(db.covid.aggregate(pipeline)))
+    pipelines = generate_pipeline(config)
+    for pipeline in pipelines:
+        print("pipeline: ", pipeline)
+        if config['collection'] == 'states':
+            pprint.pprint(list(db.states.aggregate(pipeline)))
+        else:
+            pprint.pprint(list(db.covid.aggregate(pipeline)))
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
-    pipeline = []
-    pipeline = [interpret_counties(config) , interpret_time(config)]
-    if config['aggregation'] == 'fiftyStates':
-        fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-        pipeline.append({"$match": {"state": {"$in": fifty_states}}})
-    pipeline.append(interpret_counties(config)) 
-    pipeline.append(interpret_time(config))
-    pipeline.append(interpret_aggregate(config))
-    #example pipeline to make sure everything is working
-    #pipeline = [{"$match": {"state": "CA"}},{"$match": {"date": {"$gte": 20200401, "$lte": 20200415}}},{"$project": {"_id":0, "positive":1, "date":1}},{"$sort": {"date":1}}]
-    return pipeline
+    pipelines = []
+    tasks = interpret_aggregate(config)
+    for task in tasks:
+        pipeline = []
+        if interpret_counties(config):
+            pipeline.append(interpret_counties(config))
+        if interpret_time(config):
+            pipeline.append(interpret_time(config))
+        if config['aggregation'] == 'fiftyStates':
+            fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+            pipeline.append({"$match": {"state": {"$in": fifty_states}}})
+        if '$project' in task and "ratio" in task['$project']:
+            pipeline.append({"$match" : {task['$project']['ratio']['$divide'][1][1:] : {"$ne": 0}}}) 
+        pipeline.append(task)
+        pipeline.append({"$sort":{"date": 1, "state": 1}})
+        pipelines.append(pipeline)
+    return pipelines
 
 
 #each needs to take in the parameter from the config file, and return the appropriate monogDB query.
@@ -44,33 +51,46 @@ def interpret_time(config):
     today = date.today()
     pipe = ""
     if time == "today":
-        pipe = {"$match":{"date": today.strftime('%Y%m%d')}}
+        pipe = {"$match":{"date": int(today.strftime('%Y%m%d'))}}
     elif time == "yesterday":
         yesterday = today - timedelta(days=1)
-        pipe = {"$match":{"date":yesterday.strftime('%Y%m%d')}}
+        pipe = {"$match":{"date":int(yesterday.strftime('%Y%m%d'))}}
     elif time == "week":
         week_ago = today - timedelta(weeks=1)
-        pipe = {"$match":{"date":{"$gte":week_ago.strftime('%Y%m%d'),  "$lte":today.strftime('%Y%m%d')}}}
+        pipe = {"$match":{"date":{"$gte":int(week_ago.strftime('%Y%m%d')),  "$lte":int(today.strftime('%Y%m%d'))}}}
     elif time == "month":
-        pipe = {"$match":{"date":{"$gte":today.strftime('%Y%m01'), "$lte":today.strftime('%Y%m%d')}}}
+        pipe = {"$match":{"date":{"$gte":int(today.strftime('%Y%m01')), "$lte":int(today.strftime('%Y%m%d'))}}}
     else:
         start = time['start']
         end = time['end']
-        pipe = {"$match":{"date":{"$gte":start , "$lte":end}}}
+        pipe = {"$match":{"date":{"$gte":int(start) , "$lte":int(end)}}}
     return pipe  
 
 
 def interpret_aggregate(config):
-    track = config['analysis']['task']['track']
     pipe = ""
-    level = config['aggregation']
-    if level == 'fiftyStates' or level == 'usa': 
-        pipe = {"$group":{"_id":"$date", track:{"$sum":"$" + track}}}
-    elif level == 'state': 
-        pipe = {"$group":{"_id":"$state", track:{"$sum":"$" + track}}}
-    elif level == 'county': 
-        pipe = {"$group":{"_id":"$county", track:{"$sum":"$" + track}}}
-    return pipe
+    tasks = []
+    for task in config['analysis']:
+        for to_do in task['task']:
+            level = config['aggregation']
+            if level == 'fiftyStates' or level == 'usa': 
+                pipe = {"$group":{"_id":"$date", track:{"$sum":"$" + track}}}
+            elif level == 'state':
+                if to_do == "track":
+                    pipe = {"$project":{"_id":0,"state":1, "date":1, task['track']:1}}
+                if to_do == "ratio":
+                    pipe = {"$project":{"_id":0,"state":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
+                if to_do == "stats":
+                    to_do_stats = []
+                    for var in task['task']['stats']:
+                        varDic = str('"avg' + var + '" : ' + ' {"$avg" : "$' + var + '"}, "std' + var + '" : {"$stdDevPop" : "$' + var + '"}') 
+                        to_do_stats.append(varDic)
+                    pipe = json.loads('{"$group" : {"_id": "$state" , ' + ', '.join(to_do_stats) + '}}' )
+            elif level == 'county': 
+                pipe = {"$group":{"_id":"$county", track:{"$sum":"$" + track}}}
+        tasks.append(pipe)
+    return tasks
+
 
 def interpret_target(config):
     pipe = ""
@@ -94,6 +114,7 @@ def interpret_counties(config):
             return {"$match": {"county": counties}}
     else:
         return ""
+
 
 def interpret_analysis(analysis):
     pass
