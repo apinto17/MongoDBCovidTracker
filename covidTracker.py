@@ -6,39 +6,54 @@ import pprint
 from bson.son import SON
 from datetime import date, timedelta
 import matplotlib.pyplot as plt
+import sys
 
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
     statesDataURL = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
     credsFile = 'credentials.json'
     configFile = 'trackerConfig.json'
+    if len(sys.argv) == 5:
+        credsFile = sys.argv[2]
+        configFile = sys.argv[4]
+    if len(sys.argv) == 3:
+        if sys.argv[1] == "-auth":
+            credsFile = sys.argv[2]
+        if sys.argv[1] == "-config":    
+            configFile = sys.argv[2]
     config = configure(configFile)
     db = getDB(credsFile)
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
     pipelines = generate_pipeline(config)
     for pipeline in pipelines:
         print("pipeline: ", pipeline)
-        if config['collection'] == 'states':
-            pprint.pprint(list(db.states.aggregate(pipeline)))
-        else:
-            pprint.pprint(list(db.covid.aggregate(pipeline)))
+       # if config['collection'] == 'states':
+       #     pprint.pprint(list(db.states.aggregate(pipeline)))
+       # else:
+       #     pprint.pprint(list(db.covid.aggregate(pipeline)))
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
     pipelines = []
+    keys = config.keys()
     tasks = interpret_aggregate(config)
     for task in tasks:
         pipeline = []
-        if interpret_counties(config):
+        if 'counties' in keys and interpret_counties(config):
             pipeline.append(interpret_counties(config))
-        if interpret_time(config):
+        if 'target' in keys and interpret_target(config):
+            pipeline.append(interpret_target(config))
+        if 'time' in keys and interpret_time(config):
             pipeline.append(interpret_time(config))
-        if config['aggregation'] == 'fiftyStates':
+        if 'aggregation' in keys and config['aggregation'] == 'fiftyStates':
             fifty_states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
             pipeline.append({"$match": {"state": {"$in": fifty_states}}})
-        if '$project' in task and "ratio" in task['$project']:
-            pipeline.append({"$match" : {task['$project']['ratio']['$divide'][1][1:] : {"$ne": 0}}}) 
-        pipeline.append(task)
+        if (isinstance(task, str)):
+            for t in task.split('---'):
+                a = '"'.join(t.split("'"))
+                pipeline.append(json.loads(a))
+        else:
+            pipeline.append(task)
         pipeline.append({"$sort":{"date": 1, "state": 1}})
         pipelines.append(pipeline)
     return pipelines
@@ -72,24 +87,34 @@ def interpret_aggregate(config):
     pipe = ""
     tasks = []
     for task in config['analysis']:
+        pipe2 = None
         for to_do in task['task']:
             level = config['aggregation']
             if level == 'fiftyStates' or level == 'usa': 
-                pipe = {"$group":{"_id":"$date", track:{"$sum":"$" + track}}}
+                pipe = {"$group":{"_id":"$date", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
+                pipe2 = {"$project":{"_id":0, "date":"$_id", task['task']['track'] : 1}}
             elif level == 'state':
-                if to_do == "track":
-                    pipe = {"$project":{"_id":0,"state":1, "date":1, task['track']:1}}
+                if to_do == "track":    
+                    pipe = {"$project":{"_id":0,"state":1, "date":1, task['task']['track']:1}}
                 if to_do == "ratio":
-                    pipe = {"$project":{"_id":0,"state":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
+                    pipe = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
+                    pipe2 = {"$project":{"_id":0,"state":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
                 if to_do == "stats":
                     to_do_stats = []
                     for var in task['task']['stats']:
                         varDic = str('"avg' + var + '" : ' + ' {"$avg" : "$' + var + '"}, "std' + var + '" : {"$stdDevPop" : "$' + var + '"}') 
                         to_do_stats.append(varDic)
+                    to_project = json.loads("{"+ ", ".join(to_do_stats) + "}" ) .keys()
+                    project = '"' + '": 1, "'.join(to_project) + '": 1'
                     pipe = json.loads('{"$group" : {"_id": "$state" , ' + ', '.join(to_do_stats) + '}}' )
+                    pipe2 = json.loads('{"$project":{"_id":0, "state":"$_id", ' + project + '}}')
             elif level == 'county': 
-                pipe = {"$group":{"_id":"$county", track:{"$sum":"$" + track}}}
-        tasks.append(pipe)
+                pipe = {"$group":{"_id":"$county", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
+                pipe2 = {"$project":{"_id":0, "county":"$_id", task['task']['track'] : 1}}
+        if pipe2:
+            tasks.append(str(pipe) +"---"+ str(pipe2))
+        else: 
+            tasks.append(pipe)
     return tasks
 
 
@@ -102,7 +127,7 @@ def interpret_target(config):
         if(type(states) is list):
             pipe = {"$match": {"state": {"$in": states}}} 
         else:
-            pipe = {"$match": {"state": state}}
+            pipe = {"$match": {"state": states}}
     return pipe
 
 
