@@ -26,11 +26,11 @@ def main():
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
     pipelines = generate_pipeline(config)
     for pipeline in pipelines:
-        print("pipeline: ", pipeline)
-       # if config['collection'] == 'states':
-       #     pprint.pprint(list(db.states.aggregate(pipeline)))
-       # else:
-       #     pprint.pprint(list(db.covid.aggregate(pipeline)))
+      #  print("pipeline: ", pipeline)
+        if config['collection'] == 'states':
+            pprint.pprint(list(db.states.aggregate(pipeline)))
+        else:
+            pprint.pprint(list(db.covid.aggregate(pipeline)))
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
