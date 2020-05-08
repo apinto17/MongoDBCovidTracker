@@ -88,11 +88,26 @@ def interpret_aggregate(config):
     tasks = []
     for task in config['analysis']:
         pipe2 = None
+        pipe3 = None
         for to_do in task['task']:
             level = config['aggregation']
             if level == 'fiftyStates' or level == 'usa': 
-                pipe = {"$group":{"_id":"$date", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
-                pipe2 = {"$project":{"_id":0, "date":"$_id", task['task']['track'] : 1}}
+                if to_do == "track":    
+                    pipe = {"$group":{"_id":"$date", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
+                    pipe2 = {"$project":{"_id":0, date: "$_id", task['task']['track'] : 1}}
+                if to_do == "ratio":
+                    pipe = {"$group":{"_id":"$date", task['task']['ratio']['numerator']:{"$sum":"$" + task['task']['ratio']['numerator']}, task['task']['ratio']['denominator']:{"$sum":"$" + task['task']['ratio']['denominator']}}}
+                    pipe2 = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
+                    pipe3 = {"$project":{"_id":0, "date":"$_id", "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
+                if to_do == "stats":
+                    to_do_stats = []
+                    for var in task['task']['stats']:
+                        varDic = str('"avg' + var + '" : ' + ' {"$avg" : "$' + var + '"}, "std' + var + '" : {"$stdDevPop" : "$' + var + '"}') 
+                        to_do_stats.append(varDic)
+                    to_project = json.loads("{"+ ", ".join(to_do_stats) + "}" ) .keys()
+                    project = '"' + '": 1, "'.join(to_project) + '": 1'
+                    pipe = json.loads('{"$group" : {"_id": "$date" , ' + ', '.join(to_do_stats) + '}}' )
+                    pipe2 = json.loads('{"$project":{"_id":0, "date":"$_id", ' + project + '}}')
             elif level == 'state':
                 if to_do == "track":    
                     pipe = {"$project":{"_id":0,"state":1, "date":1, task['task']['track']:1}}
@@ -109,9 +124,23 @@ def interpret_aggregate(config):
                     pipe = json.loads('{"$group" : {"_id": "$state" , ' + ', '.join(to_do_stats) + '}}' )
                     pipe2 = json.loads('{"$project":{"_id":0, "state":"$_id", ' + project + '}}')
             elif level == 'county': 
-                pipe = {"$group":{"_id":"$county", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
-                pipe2 = {"$project":{"_id":0, "county":"$_id", task['task']['track'] : 1}}
-        if pipe2:
+                if to_do == "track":    
+                    pipe = {"$project":{"_id":0,"county":1, "date":1, task['task']['track']:1}}
+                if to_do == "ratio":
+                    pipe = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
+                    pipe2 = {"$project":{"_id":0,"county":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
+                if to_do == "stats":
+                    to_do_stats = []
+                    for var in task['task']['stats']:
+                        varDic = str('"avg' + var + '" : ' + ' {"$avg" : "$' + var + '"}, "std' + var + '" : {"$stdDevPop" : "$' + var + '"}') 
+                        to_do_stats.append(varDic)
+                    to_project = json.loads("{"+ ", ".join(to_do_stats) + "}" ) .keys()
+                    project = '"' + '": 1, "'.join(to_project) + '": 1'
+                    pipe = json.loads('{"$group" : {"_id": "$county" , ' + ', '.join(to_do_stats) + '}}' )
+                    pipe2 = json.loads('{"$project":{"_id":0, "county":"$_id", ' + project + '}}')
+        if pipe3:
+            tasks.append(str(pipe) +"---"+ str(pipe2) + "---" str(pipe3))
+        elif pipe2:
             tasks.append(str(pipe) +"---"+ str(pipe2))
         else: 
             tasks.append(pipe)
