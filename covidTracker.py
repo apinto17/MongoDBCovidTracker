@@ -94,7 +94,7 @@ def interpret_aggregate(config):
             if level == 'fiftyStates' or level == 'usa': 
                 if to_do == "track":    
                     pipe = {"$group":{"_id":"$date", task['task']['track']:{"$sum":"$" + task['task']['track']}}}
-                    pipe2 = {"$project":{"_id":0, date: "$_id", task['task']['track'] : 1}}
+                    pipe2 = {"$project":{"_id":0, "date": "$_id", task['task']['track'] : 1}}
                 if to_do == "ratio":
                     pipe = {"$group":{"_id":"$date", task['task']['ratio']['numerator']:{"$sum":"$" + task['task']['ratio']['numerator']}, task['task']['ratio']['denominator']:{"$sum":"$" + task['task']['ratio']['denominator']}}}
                     pipe2 = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
