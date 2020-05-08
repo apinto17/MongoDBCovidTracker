@@ -139,7 +139,7 @@ def interpret_aggregate(config):
                     pipe = json.loads('{"$group" : {"_id": "$county" , ' + ', '.join(to_do_stats) + '}}' )
                     pipe2 = json.loads('{"$project":{"_id":0, "county":"$_id", ' + project + '}}')
         if pipe3:
-            tasks.append(str(pipe) +"---"+ str(pipe2) + "---" str(pipe3))
+            tasks.append(str(pipe) +"---"+ str(pipe2) + "---" + str(pipe3))
         elif pipe2:
             tasks.append(str(pipe) +"---"+ str(pipe2))
         else: 
