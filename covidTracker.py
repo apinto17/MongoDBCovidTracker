@@ -5,6 +5,7 @@ from pymongo import MongoClient
 import pprint
 from bson.son import SON
 from datetime import date, timedelta
+import datetime as dt
 import matplotlib.pyplot as plt
 import sys
 
@@ -22,15 +23,48 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    db = getDB(credsFile)
-    refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    pipelines = generate_pipeline(config)
-    for pipeline in pipelines:
-      #  print("pipeline: ", pipeline)
-        if config['collection'] == 'states':
-            pprint.pprint(list(db.states.aggregate(pipeline)))
-        else:
-            pprint.pprint(list(db.covid.aggregate(pipeline)))
+    output = [{"date": 20200501, "ratio": 0.04109670512668015, "state": "CA"},
+ {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
+ {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
+  {"date": 20200501, "ratio": 0.05681580233126265, "state": "MI"},
+ {"date": 20200502, "ratio": 0.041592428683640825, "state": "CA"},
+ {"date": 20200502, "ratio": 0.06041658013208638, "state": "NY"},
+ {"date": 20200502, "ratio": 0.05629568900731024, "state": "WA"},
+  {"date": 20200502, "ratio": 0.05681580233126265, "state": "MI"},
+ {"date": 20200503, "ratio": 0.041312294837361985, "state": "CA"},
+ {"date": 20200503, "ratio": 0.06064503895200923, "state": "NY"},
+ {"date": 20200503, "ratio": 0.05532226887955742, "state": "WA"},
+ {"date": 20200503, "ratio": 0.05532226887955742, "state": "MI"},
+ {"date": 20200504, "ratio": 0.04102881482425324, "state": "CA"},
+ {"date": 20200504, "ratio": 0.060871037425576806, "state": "NY"},
+ {"date": 20200504, "ratio": 0.054922621007573266, "state": "WA"},
+ {"date": 20200504, "ratio": 0.054922621007573266, "state": "MI"},
+ {"date": 20200505, "ratio": 0.04121895680637586, "state": "CA"},
+ {"date": 20200505, "ratio": 0.06116279359386286, "state": "NY"},
+ {"date": 20200505, "ratio": 0.05439141120165567, "state": "WA"},
+ {"date": 20200505, "ratio": 0.05439141120165567, "state": "MI"},
+ {"date": 20200506, "ratio": 0.04100994644223412, "state": "CA"},
+ {"date": 20200506, "ratio": 0.061352931371883274, "state": "NY"},
+ {"date": 20200506, "ratio": 0.05527767089906374, "state": "WA"},
+ {"date": 20200506, "ratio": 0.05527767089906374, "state": "MI"},
+ {"date": 20200507, "ratio": 0.041310588312931, "state": "CA"},
+ {"date": 20200507, "ratio": 0.06356802553952554, "state": "NY"},
+ {"date": 20200507, "ratio": 0.05469977994341402, "state": "WA"},
+ {"date": 20200507, "ratio": 0.05469977994341402, "state": "MI"},
+ {"date": 20200508, "ratio": 0.041352060404402355, "state": "CA"},
+ {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
+ {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
+ {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
+    interpret_output(config, output)
+    # db = getDB(credsFile)
+    # refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    # pipelines = generate_pipeline(config)
+    # for pipeline in pipelines:
+    #   #  print("pipeline: ", pipeline)
+    #     if config['collection'] == 'states':
+    #         pprint.pprint(list(db.states.aggregate(pipeline)))
+    #     else:
+    #         pprint.pprint(list(db.covid.aggregate(pipeline)))
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
@@ -138,21 +172,147 @@ def interpret_counties(config):
             return {"$match": {"county": {"$in": counties }}} 
         else:
             return {"$match": {"county": counties}}
-        
+     
     else:
         return ""
 
 
-def interpret_output(config):
+def interpret_output(config, output):
     for task in config["analysis"]:
         if("graph" in task["output"].keys()):
-            graph = task["output"]["graph"]
-            if(graph["type"] == "bar"):
-                plt.bar()
-            elif(graph["type"] == "line"):
-                plt.plot()
-            elif(graph["type"] == "scatter"):
-                plt.scatter()
+            make_graph(task, output, config)
+        if("table" in task["output"].keys()):
+            make_table(task)
+
+
+def make_table(task):
+    pass
+
+
+def make_graph(task, output, config):
+    graph = task["output"]["graph"]
+    output_var = get_output_var(task["task"])
+    if(graph["type"] == "bar"):
+        render_plots(output, output_var, config, graph, plt.bar)
+    elif(graph["type"] == "line"):
+        render_plots(output, output_var, config, graph, plt.plot)
+    elif(graph["type"] == "scatter"):
+        render_plots(output, output_var, config, graph, plt.scatter)
+
+
+def render_plots(output, output_var, config, graph, plot_func):
+    xlist, ylist = report_xy_lists(output, output_var, config["target"])
+    if(graph["combo"] == "separate"):
+        make_plots(xlist, ylist, config, graph, output_var, False, plot_func)
+        plt.show()
+    elif(graph["combo"] == "combine"):
+        make_plots(xlist, ylist, config, graph, output_var, True, plot_func)
+        plt.show()
+    elif(graph["combo"] == "split"):
+        xlist_of_3, ylist_of_3 = get_lists_of_3(xlist, ylist)
+        i = 0
+        offset = 0
+        while(i < len(xlist_of_3)):
+            plt.figure(i)
+            make_plots(xlist_of_3[i], ylist_of_3[i], config, graph, output_var, True, plot_func, offset)
+            offset += len(xlist_of_3[i])
+            i += 1
+        plt.show()
+
+
+def get_lists_of_3(xlist, ylist):
+    xlist_of_3 = []
+    ylist_of_3 = []
+    i = 0
+    while(i < len(xlist)):
+        j = 0
+        xTemp = []
+        yTemp = []
+        while(i < len(xlist) and j < len(xlist) and j < 3):
+            xTemp.append(xlist[i])
+            yTemp.append(ylist[i])
+            i += 1
+            j += 1
+        xlist_of_3.append(xTemp)
+        ylist_of_3.append(yTemp)
+    
+    return xlist_of_3, ylist_of_3
+
+
+def make_plots(xlist, ylist, config, graph, output_var, combine, plot_func, offset=0):
+    for i in range(len(xlist)):
+        legend_name = config["target"][i + offset]
+        if(combine):
+            plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name)
+        else:
+            plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name, i)
+        plt.legend()
+
+
+def report_xy_lists(output, output_var, targets):
+    xlist = []
+    ylist = []
+    target_type = get_target_type(output)
+
+    if(type(targets) is list):
+        for target in targets:
+            x, y = report_xy(output, output_var, target, target_type)
+            xlist.append(x)
+            ylist.append(y)
+
+    return xlist, ylist
+
+
+def get_target_type(output):
+    target_type = None
+    if("state" in output[0].keys()):
+        target_type = "state"
+    else:
+        target_type = "county"
+    
+    return target_type
+
+
+def plot_xy(plot_func, x, y, graph, output_var, legend_name, figure_num=None):
+    if(figure_num is not None):
+        plt.figure(figure_num)
+    if("title" in graph.keys()):
+        plt.suptitle(graph["title"])
+    if("legend" in graph.keys() and graph["legend"] == "on"):
+        plot_func(x, y, label=legend_name)
+    else:
+        plot_func(x, y)
+
+
+def get_output_var(task):
+    if(type(task) is dict):
+        if("ratio" in task.keys()):
+            return "ratio"
+        else:
+            return "stats"
+    else:
+        return task["track"]
+
+
+def report_xy(output, output_var, target=None, target_type=None):
+    x = []
+    y = []
+    for data_point in output:
+        if(target is None):
+            x.append(to_datetime(data_point["date"]))
+            y.append(data_point[output_var])
+        elif(data_point[target_type] == target):
+            x.append(to_datetime(data_point["date"]))
+            y.append(data_point[output_var])
+    return x, y
+
+
+def to_datetime(time):
+    time_str = str(time)
+    year = int(time_str[0:4])
+    month = int(time_str[4:6])
+    day = int(time_str[6:])
+    return date(year, month, day)
 
 
 #updates db collections with data from APIs
