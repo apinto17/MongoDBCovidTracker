@@ -1,0 +1,2 @@
+#!/bin/bash
+python3 covidTracker.py -config trackerConfig1.json && python3 covidTracker.py -config trackerConfig2.json && python3 covidTracker.py -config trackerConfig3.json && python3 covidTracker.py -config trackerConfig4.json && python3 covidTracker.py -config trackerConfig5.json && python3 covidTracker.py -config trackerConfig6.json && python3 covidTracker.py -config trackerConfig7.json 
