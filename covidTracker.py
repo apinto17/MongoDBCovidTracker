@@ -23,38 +23,14 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    output = [{"date": 20200501, "ratio": 0.04109670512668015, "state": "CA"},
- {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
- {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
-  {"date": 20200501, "ratio": 0.05681580233126265, "state": "MI"},
- {"date": 20200502, "ratio": 0.041592428683640825, "state": "CA"},
- {"date": 20200502, "ratio": 0.06041658013208638, "state": "NY"},
- {"date": 20200502, "ratio": 0.05629568900731024, "state": "WA"},
-  {"date": 20200502, "ratio": 0.05681580233126265, "state": "MI"},
- {"date": 20200503, "ratio": 0.041312294837361985, "state": "CA"},
- {"date": 20200503, "ratio": 0.06064503895200923, "state": "NY"},
- {"date": 20200503, "ratio": 0.05532226887955742, "state": "WA"},
- {"date": 20200503, "ratio": 0.05532226887955742, "state": "MI"},
- {"date": 20200504, "ratio": 0.04102881482425324, "state": "CA"},
- {"date": 20200504, "ratio": 0.060871037425576806, "state": "NY"},
- {"date": 20200504, "ratio": 0.054922621007573266, "state": "WA"},
- {"date": 20200504, "ratio": 0.054922621007573266, "state": "MI"},
- {"date": 20200505, "ratio": 0.04121895680637586, "state": "CA"},
- {"date": 20200505, "ratio": 0.06116279359386286, "state": "NY"},
- {"date": 20200505, "ratio": 0.05439141120165567, "state": "WA"},
- {"date": 20200505, "ratio": 0.05439141120165567, "state": "MI"},
- {"date": 20200506, "ratio": 0.04100994644223412, "state": "CA"},
- {"date": 20200506, "ratio": 0.061352931371883274, "state": "NY"},
- {"date": 20200506, "ratio": 0.05527767089906374, "state": "WA"},
- {"date": 20200506, "ratio": 0.05527767089906374, "state": "MI"},
- {"date": 20200507, "ratio": 0.041310588312931, "state": "CA"},
- {"date": 20200507, "ratio": 0.06356802553952554, "state": "NY"},
- {"date": 20200507, "ratio": 0.05469977994341402, "state": "WA"},
- {"date": 20200507, "ratio": 0.05469977994341402, "state": "MI"},
- {"date": 20200508, "ratio": 0.041352060404402355, "state": "CA"},
- {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
- {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
- {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
+    output = [{"date": 20200501, "death": 2991},
+ {"date": 20200502, "death": 3104},
+ {"date": 20200503, "death": 3154},
+ {"date": 20200504, "death": 3197},
+ {"date": 20200505, "death": 3271},
+ {"date": 20200506, "death": 3389},
+ {"date": 20200507, "death": 3495},
+ {"date": 20200508, "death": 3600}]
     interpret_output(config, output)
     # db = getDB(credsFile)
     # refresh(config['refresh'], db,covidDataURL, statesDataURL)
@@ -230,7 +206,10 @@ def make_graph(task, output, config):
 
 
 def render_plots(output, output_var, config, graph, plot_func):
-    xlist, ylist = report_xy_lists(output, output_var, config["target"])
+    target = None
+    if("target" in config.keys() and (config["aggregation"] == "state" or config["aggregation"] == "county")):
+        target = config["target"]
+    xlist, ylist = report_xy_lists(output, output_var, target)
     if(graph["combo"] == "separate"):
         make_plots(xlist, ylist, config, graph, output_var, False, plot_func)
         plt.show()
@@ -270,24 +249,32 @@ def get_lists_of_3(xlist, ylist):
 
 def make_plots(xlist, ylist, config, graph, output_var, combine, plot_func, offset=0):
     for i in range(len(xlist)):
-        legend_name = config["target"][i + offset]
+        legend_name = None
+        if("legend" in graph.keys() and graph["legend"] == "on"):
+            legend_name = config["target"][i + offset]
         if(combine):
             plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name)
         else:
             plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name, i)
-        plt.legend()
+        if("legend" in graph.keys() and graph["legend"] == "on"):
+            plt.legend()
 
 
 def report_xy_lists(output, output_var, targets):
     xlist = []
     ylist = []
-    target_type = get_target_type(output)
 
     if(type(targets) is list):
+        target_type = get_target_type(output)
         for target in targets:
             x, y = report_xy(output, output_var, target, target_type)
             xlist.append(x)
             ylist.append(y)
+    else:
+        x, y = report_xy(output, output_var)
+
+    xlist = [x]
+    ylist = [y]
 
     return xlist, ylist
 
@@ -296,8 +283,10 @@ def get_target_type(output):
     target_type = None
     if("state" in output[0].keys()):
         target_type = "state"
-    else:
+    elif("county" in output[0].keys()):
         target_type = "county"
+    else:
+        raise ValueError("Target type cannot be found")
     
     return target_type
 
@@ -307,18 +296,17 @@ def plot_xy(plot_func, x, y, graph, output_var, legend_name, figure_num=None):
         plt.figure(figure_num)
     if("title" in graph.keys()):
         plt.suptitle(graph["title"])
-    if("legend" in graph.keys() and graph["legend"] == "on"):
+    if(legend_name is not None):
         plot_func(x, y, label=legend_name)
     else:
         plot_func(x, y)
 
 
 def get_output_var(task):
-    if(type(task) is dict):
-        if("ratio" in task.keys()):
-            return "ratio"
-        else:
-            return "stats"
+    if("ratio" in task.keys()):
+        return "ratio"
+    elif("stats" in task.keys()):
+        return "stats"
     else:
         return task["track"]
 
