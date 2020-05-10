@@ -23,48 +23,50 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
+    """
     output = [{"date": 20200501, "ratio": 0.04109670512668015, "state": "CA"},
- {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
- {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
-  {"date": 20200501, "ratio": 0.05681580233126265, "state": "MI"},
- {"date": 20200502, "ratio": 0.041592428683640825, "state": "CA"},
- {"date": 20200502, "ratio": 0.06041658013208638, "state": "NY"},
- {"date": 20200502, "ratio": 0.05629568900731024, "state": "WA"},
-  {"date": 20200502, "ratio": 0.05681580233126265, "state": "MI"},
- {"date": 20200503, "ratio": 0.041312294837361985, "state": "CA"},
- {"date": 20200503, "ratio": 0.06064503895200923, "state": "NY"},
- {"date": 20200503, "ratio": 0.05532226887955742, "state": "WA"},
- {"date": 20200503, "ratio": 0.05532226887955742, "state": "MI"},
- {"date": 20200504, "ratio": 0.04102881482425324, "state": "CA"},
- {"date": 20200504, "ratio": 0.060871037425576806, "state": "NY"},
- {"date": 20200504, "ratio": 0.054922621007573266, "state": "WA"},
- {"date": 20200504, "ratio": 0.054922621007573266, "state": "MI"},
- {"date": 20200505, "ratio": 0.04121895680637586, "state": "CA"},
- {"date": 20200505, "ratio": 0.06116279359386286, "state": "NY"},
- {"date": 20200505, "ratio": 0.05439141120165567, "state": "WA"},
- {"date": 20200505, "ratio": 0.05439141120165567, "state": "MI"},
- {"date": 20200506, "ratio": 0.04100994644223412, "state": "CA"},
- {"date": 20200506, "ratio": 0.061352931371883274, "state": "NY"},
- {"date": 20200506, "ratio": 0.05527767089906374, "state": "WA"},
- {"date": 20200506, "ratio": 0.05527767089906374, "state": "MI"},
- {"date": 20200507, "ratio": 0.041310588312931, "state": "CA"},
- {"date": 20200507, "ratio": 0.06356802553952554, "state": "NY"},
- {"date": 20200507, "ratio": 0.05469977994341402, "state": "WA"},
- {"date": 20200507, "ratio": 0.05469977994341402, "state": "MI"},
- {"date": 20200508, "ratio": 0.041352060404402355, "state": "CA"},
- {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
- {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
- {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
+     {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
+     {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
+      {"date": 20200501, "ratio": 0.05681580233126265, "state": "MI"},
+     {"date": 20200502, "ratio": 0.041592428683640825, "state": "CA"},
+     {"date": 20200502, "ratio": 0.06041658013208638, "state": "NY"},
+     {"date": 20200502, "ratio": 0.05629568900731024, "state": "WA"},
+      {"date": 20200502, "ratio": 0.05681580233126265, "state": "MI"},
+     {"date": 20200503, "ratio": 0.041312294837361985, "state": "CA"},
+     {"date": 20200503, "ratio": 0.06064503895200923, "state": "NY"},
+     {"date": 20200503, "ratio": 0.05532226887955742, "state": "WA"},
+     {"date": 20200503, "ratio": 0.05532226887955742, "state": "MI"},
+     {"date": 20200504, "ratio": 0.04102881482425324, "state": "CA"},
+     {"date": 20200504, "ratio": 0.060871037425576806, "state": "NY"},
+     {"date": 20200504, "ratio": 0.054922621007573266, "state": "WA"},
+     {"date": 20200504, "ratio": 0.054922621007573266, "state": "MI"},
+     {"date": 20200505, "ratio": 0.04121895680637586, "state": "CA"},
+     {"date": 20200505, "ratio": 0.06116279359386286, "state": "NY"},
+     {"date": 20200505, "ratio": 0.05439141120165567, "state": "WA"},
+     {"date": 20200505, "ratio": 0.05439141120165567, "state": "MI"},
+     {"date": 20200506, "ratio": 0.04100994644223412, "state": "CA"},
+     {"date": 20200506, "ratio": 0.061352931371883274, "state": "NY"},
+     {"date": 20200506, "ratio": 0.05527767089906374, "state": "WA"},
+     {"date": 20200506, "ratio": 0.05527767089906374, "state": "MI"},
+     {"date": 20200507, "ratio": 0.041310588312931, "state": "CA"},
+     {"date": 20200507, "ratio": 0.06356802553952554, "state": "NY"},
+     {"date": 20200507, "ratio": 0.05469977994341402, "state": "WA"},
+     {"date": 20200507, "ratio": 0.05469977994341402, "state": "MI"},
+     {"date": 20200508, "ratio": 0.041352060404402355, "state": "CA"},
+     {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
+     {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
+     {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
+     """
+    db = getDB(credsFile)
+    refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    pipelines = generate_pipeline(config)
+    for pipeline in pipelines:
+        if config['collection'] == 'states':
+            output = (list(db.states.aggregate(pipeline)))
+        else:
+            output = (list(db.covid.aggregate(pipeline)))
+    print(output)
     interpret_output(config, output)
-    # db = getDB(credsFile)
-    # refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    # pipelines = generate_pipeline(config)
-    # for pipeline in pipelines:
-    #   #  print("pipeline: ", pipeline)
-    #     if config['collection'] == 'states':
-    #         pprint.pprint(list(db.states.aggregate(pipeline)))
-    #     else:
-    #         pprint.pprint(list(db.covid.aggregate(pipeline)))
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
@@ -160,6 +162,7 @@ def interpret_aggregate(config):
             elif level == 'county': 
                 if to_do == "track":    
                     pipe = {"$project":{"_id":0,"county":1, "date":1, task['task']['track']:1}}
+                    print(task['task']['track'])
                 if to_do == "ratio":
                     pipe = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
                     pipe2 = {"$project":{"_id":0,"county":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
@@ -366,11 +369,13 @@ def csv2json(csv):
     for line in csv.split("\n")[1:]:
         line = line.split(",")
         dic = {}
-        for item in range(len(header)):
+        for item in range(len(header) + 1):
             if item == 0:
                 dic[header[item]] = int("".join(line[item].split("-")))
             elif item == 2:
                 dic[header[item]] = state_conv[line[item]]
+            elif item == len(header):
+                dic['positive'] = line[4]
             else:
                 dic[header[item]] = line[item]
         newLis.append(dic)  
