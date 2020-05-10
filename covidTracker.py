@@ -23,7 +23,6 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    """
     output = [{"date": 20200501, "ratio": 0.04109670512668015, "state": "CA"},
      {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
      {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
@@ -56,7 +55,6 @@ def main():
      {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
      {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
      {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
-     """
     db = getDB(credsFile)
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
     pipelines = generate_pipeline(config)
@@ -68,6 +66,15 @@ def main():
         else:
             output = (list(db.covid.aggregate(pipeline)))
     print(output)
+    # db = getDB(credsFile)
+    # refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    # pipelines = generate_pipeline(config)
+    # for pipeline in pipelines:
+    #     if config['collection'] == 'states':
+    #         output = (list(db.states.aggregate(pipeline)))
+    #     else:
+    #         output = (list(db.covid.aggregate(pipeline)))
+    # print(output)
     interpret_output(config, output)
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
@@ -234,7 +241,10 @@ def make_graph(task, output, config):
 
 
 def render_plots(output, output_var, config, graph, plot_func):
-    xlist, ylist = report_xy_lists(output, output_var, config["target"])
+    target = None
+    if("target" in config.keys() and (config["aggregation"] == "state" or config["aggregation"] == "county")):
+        target = config["target"]
+    xlist, ylist = report_xy_lists(output, output_var, target)
     if(graph["combo"] == "separate"):
         make_plots(xlist, ylist, config, graph, output_var, False, plot_func)
         plt.show()
@@ -274,24 +284,32 @@ def get_lists_of_3(xlist, ylist):
 
 def make_plots(xlist, ylist, config, graph, output_var, combine, plot_func, offset=0):
     for i in range(len(xlist)):
-        legend_name = config["target"][i + offset]
+        legend_name = None
+        if("legend" in graph.keys() and graph["legend"] == "on"):
+            legend_name = config["target"][i + offset]
         if(combine):
             plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name)
         else:
             plot_xy(plot_func, xlist[i], ylist[i], graph, output_var, legend_name, i)
-        plt.legend()
+        if("legend" in graph.keys() and graph["legend"] == "on"):
+            plt.legend()
 
 
 def report_xy_lists(output, output_var, targets):
     xlist = []
     ylist = []
-    target_type = get_target_type(output)
 
     if(type(targets) is list):
+        target_type = get_target_type(output)
         for target in targets:
             x, y = report_xy(output, output_var, target, target_type)
             xlist.append(x)
             ylist.append(y)
+    else:
+        x, y = report_xy(output, output_var)
+
+    xlist = [x]
+    ylist = [y]
 
     return xlist, ylist
 
@@ -300,8 +318,10 @@ def get_target_type(output):
     target_type = None
     if("state" in output[0].keys()):
         target_type = "state"
-    else:
+    elif("county" in output[0].keys()):
         target_type = "county"
+    else:
+        raise ValueError("Target type cannot be found")
     
     return target_type
 
@@ -311,18 +331,17 @@ def plot_xy(plot_func, x, y, graph, output_var, legend_name, figure_num=None):
         plt.figure(figure_num)
     if("title" in graph.keys()):
         plt.suptitle(graph["title"])
-    if("legend" in graph.keys() and graph["legend"] == "on"):
+    if(legend_name is not None):
         plot_func(x, y, label=legend_name)
     else:
         plot_func(x, y)
 
 
 def get_output_var(task):
-    if(type(task) is dict):
-        if("ratio" in task.keys()):
-            return "ratio"
-        else:
-            return "stats"
+    if("ratio" in task.keys()):
+        return "ratio"
+    elif("stats" in task.keys()):
+        return "stats"
     else:
         return task["track"]
 
