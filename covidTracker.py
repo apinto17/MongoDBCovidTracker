@@ -8,6 +8,12 @@ from datetime import date, timedelta
 import datetime as dt
 import matplotlib.pyplot as plt
 import sys
+import numpy as np
+import pandas as pd
+import base64
+from io import BytesIO
+
+
 
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
@@ -23,53 +29,27 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    output = [{"date": 20200501, "ratio": 0.04109670512668015, "state": "CA"},
-     {"date": 20200501, "ratio": 0.06036054152584703, "state": "NY"},
-     {"date": 20200501, "ratio": 0.05681580233126265, "state": "WA"},
-      {"date": 20200501, "ratio": 0.05681580233126265, "state": "MI"},
-     {"date": 20200502, "ratio": 0.041592428683640825, "state": "CA"},
-     {"date": 20200502, "ratio": 0.06041658013208638, "state": "NY"},
-     {"date": 20200502, "ratio": 0.05629568900731024, "state": "WA"},
-      {"date": 20200502, "ratio": 0.05681580233126265, "state": "MI"},
-     {"date": 20200503, "ratio": 0.041312294837361985, "state": "CA"},
-     {"date": 20200503, "ratio": 0.06064503895200923, "state": "NY"},
-     {"date": 20200503, "ratio": 0.05532226887955742, "state": "WA"},
-     {"date": 20200503, "ratio": 0.05532226887955742, "state": "MI"},
-     {"date": 20200504, "ratio": 0.04102881482425324, "state": "CA"},
-     {"date": 20200504, "ratio": 0.060871037425576806, "state": "NY"},
-     {"date": 20200504, "ratio": 0.054922621007573266, "state": "WA"},
-     {"date": 20200504, "ratio": 0.054922621007573266, "state": "MI"},
-     {"date": 20200505, "ratio": 0.04121895680637586, "state": "CA"},
-     {"date": 20200505, "ratio": 0.06116279359386286, "state": "NY"},
-     {"date": 20200505, "ratio": 0.05439141120165567, "state": "WA"},
-     {"date": 20200505, "ratio": 0.05439141120165567, "state": "MI"},
-     {"date": 20200506, "ratio": 0.04100994644223412, "state": "CA"},
-     {"date": 20200506, "ratio": 0.061352931371883274, "state": "NY"},
-     {"date": 20200506, "ratio": 0.05527767089906374, "state": "WA"},
-     {"date": 20200506, "ratio": 0.05527767089906374, "state": "MI"},
-     {"date": 20200507, "ratio": 0.041310588312931, "state": "CA"},
-     {"date": 20200507, "ratio": 0.06356802553952554, "state": "NY"},
-     {"date": 20200507, "ratio": 0.05469977994341402, "state": "WA"},
-     {"date": 20200507, "ratio": 0.05469977994341402, "state": "MI"},
-     {"date": 20200508, "ratio": 0.041352060404402355, "state": "CA"},
-     {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
-     {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
-     {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
-    db = getDB(credsFile)
-    refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    pipelines = generate_pipeline(config)
-
-    for pipeline in pipelines:
-        print(pipeline)
-        if config['collection'] == 'states':
-            output = (list(db.states.aggregate(pipeline)))
-        else:
-            output = (list(db.covid.aggregate(pipeline)))
-    print(output)
+    output = [{"avgdeath": 2316.375,
+ "avgpositive": 56168.125,
+ "state": "CA",
+ "stddeath": 162.41916258557683,
+ "stdpositive": 3930.7406883913136},
+ {"avgdeath": 19689.75,
+ "avgpositive": 319985.625,
+ "state": "NY",
+ "stddeath": 811.7149669064871,
+ "stdpositive": 6927.211775626251},
+ {"avgdeath": 845.75,
+ "avgpositive": 15293.0,
+ "state": "WA",
+ "stddeath": 24.468091466234167,
+ "stdpositive": 595.0636520574913}]
     # db = getDB(credsFile)
     # refresh(config['refresh'], db,covidDataURL, statesDataURL)
     # pipelines = generate_pipeline(config)
+
     # for pipeline in pipelines:
+    #     print(pipeline)
     #     if config['collection'] == 'states':
     #         output = (list(db.states.aggregate(pipeline)))
     #     else:
@@ -219,32 +199,82 @@ def interpret_counties(config):
 
 def interpret_output(config, output):
     for task in config["analysis"]:
-        if("graph" in task["output"].keys()):
-            make_graph(task, output, config)
+        # if("graph" in task["output"].keys()):
+        #     make_graph(task, output, config)
         if("table" in task["output"].keys()):
             make_table(task, output, config)
 
 
 def make_table(task, output, config):
-    rows = get_row_col_values(task["output"]["table"], output, config, "row")
-    cols = get_row_col_values(task["output"]["table"], output, config, "column")
+    row_key, row_values = get_row_col_values(task["output"]["table"]["row"], output, config, task["task"])
+    col_key, col_values = get_row_col_values(task["output"]["table"]["column"], output, config, task["task"])
+
+    output_var = get_output_var(task["task"])
+    table = []
+    vals_to_remove = []
 
 
-def get_row_col_values(table, output, config, key):
+    for col_value in col_values:
+        row_list = []
+        for row_value in row_values:
+            for data_point in output:
+                if(row_key is None or col_key is None):
+                    row_list.append(data_point[output_var])
+                elif(row_key == "stats"):
+                    if(data_point[col_key] == col_value):
+                        row_list.append(data_point[row_value])
+                    else:
+                        continue
+                elif(col_key == "stats"):
+                    if(data_point[row_key] == row_value):
+                        row_list.append(data_point[col_value])
+                    else:
+                        continue
+                elif(data_point[row_key] == row_value and data_point[col_key] == col_value and output_var in data_point.keys()):
+                    row_list.append(data_point[output_var])
+        if(len(row_list) > 0):
+            table.append(row_list)
+        else:
+            vals_to_remove.append(col_value)
+
+    for val in vals_to_remove:
+        col_values.remove(val)
+
+    table = np.array(table)
+
+    df = pd.DataFrame(table, index=col_values, columns=row_values)
+    html = df.to_html()
+    print(html)
+
+
+def get_row_col_values(key, output, config, task):
     res = []
-    i = 0
-    for data_point in output:
-        if(table[key] == "time"):
-            res.append(to_datetime(data_point["date"]))
-        elif(table[key] == "state"):
-            if(config["aggregation"] == "state"):
-                res.append(data_point["state"])
-            elif(config["aggregation"] == "usa" or config["aggregation"] == "fiftyStates"):
-                res.append(i) # I dont know if this is correct, spec says "aggregate numbers"
-        elif(table[key] == "county"):
-            res.append(data_point["county"])
-
-
+    res_key = [None]
+    if(key == "time"):
+        for data_point in output:
+            if(data_point["date"] not in res):
+                res.append(data_point["date"])
+        res_key = "date"
+    elif(key == "state"):
+        if(config["aggregation"] == "state"):
+            if(type(config["target"]) is list):
+                res = config["target"]               
+            else:
+                res.append(config["target"])
+            res_key = "state"
+        elif(config["aggregation"] == "usa" or config["aggregation"] == "fiftyStates"):
+            res = [i for i in range(len(output))] # I dont know if this is correct, spec says "aggregate numbers"
+    elif(key == "county"):
+        res = config["counties"]
+        res_key = "county"
+    elif(key == "stats"):
+        stats_var = task["stats"]
+        for stat in stats_var:
+            res.append("avg" + stat)
+            res.append("std" + stat)
+        res_key = "stats"
+    
+    return res_key, res
 
 
 
@@ -258,6 +288,15 @@ def make_graph(task, output, config):
     elif(graph["type"] == "scatter"):
         render_plots(output, output_var, config, graph, plt.scatter)
 
+    fig = plt.figure()
+    tmpfile = BytesIO()
+    fig.savefig(tmpfile, format='png')
+    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
+
+    html = 'Some html head' + '<img src=\'data:image/png;base64,{}\'>'.format(encoded)
+
+    return html
+
 
 def render_plots(output, output_var, config, graph, plot_func):
     target = None
@@ -266,10 +305,8 @@ def render_plots(output, output_var, config, graph, plot_func):
     xlist, ylist = report_xy_lists(output, output_var, target)
     if(graph["combo"] == "separate"):
         make_plots(xlist, ylist, config, graph, output_var, False, plot_func)
-        plt.show()
     elif(graph["combo"] == "combine"):
         make_plots(xlist, ylist, config, graph, output_var, True, plot_func)
-        plt.show()
     elif(graph["combo"] == "split"):
         xlist_of_3, ylist_of_3 = get_lists_of_3(xlist, ylist)
         i = 0
@@ -279,7 +316,6 @@ def render_plots(output, output_var, config, graph, plot_func):
             make_plots(xlist_of_3[i], ylist_of_3[i], config, graph, output_var, True, plot_func, offset)
             offset += len(xlist_of_3[i])
             i += 1
-        plt.show()
 
 
 def get_lists_of_3(xlist, ylist):
