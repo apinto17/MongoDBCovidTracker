@@ -55,6 +55,17 @@ def main():
      {"date": 20200508, "ratio": 0.06369417112833566, "state": "NY"},
      {"date": 20200508, "ratio": 0.054894954100178674, "state": "WA"},
      {"date": 20200508, "ratio": 0.054894954100178674, "state": "MI"}]
+    db = getDB(credsFile)
+    refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    pipelines = generate_pipeline(config)
+
+    for pipeline in pipelines:
+        print(pipeline)
+        if config['collection'] == 'states':
+            output = (list(db.states.aggregate(pipeline)))
+        else:
+            output = (list(db.covid.aggregate(pipeline)))
+    print(output)
     # db = getDB(credsFile)
     # refresh(config['refresh'], db,covidDataURL, statesDataURL)
     # pipelines = generate_pipeline(config)
@@ -160,7 +171,6 @@ def interpret_aggregate(config):
             elif level == 'county': 
                 if to_do == "track":    
                     pipe = {"$project":{"_id":0,"county":1, "date":1, task['task']['track']:1}}
-                    print(task['task']['track'])
                 if to_do == "ratio":
                     pipe = {"$match" : { task['task']['ratio']['denominator']: {"$ne": 0}}} 
                     pipe2 = {"$project":{"_id":0,"county":1, "date":1, "ratio":{"$divide": ["$" + task['task']['ratio']['numerator'], "$" + task['task']['ratio']['denominator']]}}}
@@ -395,19 +405,20 @@ def csv2json(csv):
     state_conv = {'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC', 'Marshall Islands': 'MH', 'Armed Forces Africa': 'AE', 'Armed Forces Americas': 'AA', 'Armed Forces Canada': 'AE', 'Armed Forces Europe': 'AE', 'Armed Forces Middle East': 'AE', 'Armed Forces Pacific': 'AP', 'Puerto Rico': 'PR', 'Virgin Islands': 'VI', 'Guam': 'GU', 'Northern Mariana Islands': 'MP'}
     newLis = []
     header = csv.split("\n")[0].split(",")
+    tracker = {}
     for line in csv.split("\n")[1:]:
         line = line.split(",")
         dic = {}
-        for item in range(len(header) + 1):
-            if item == 0:
-                dic[header[item]] = int("".join(line[item].split("-")))
-            elif item == 2:
-                dic[header[item]] = state_conv[line[item]]
-            elif item == len(header):
-                dic['positive'] = line[4]
-            else:
-                dic[header[item]] = line[item]
-        newLis.append(dic)  
+        today = line[0].split("-")
+        yesterday = (date(int(today[0]), int(today[1]), int(today[2])) - timedelta(days = 1)).strftime('%Y%m%d')
+        death_prev = 0
+        pos_prev = 0
+        if (state_conv[line[2]] + line[1] + yesterday) in tracker.keys():
+            death_prev = tracker[state_conv[line[2]] + line[1] + yesterday][1]
+            pos_prev = tracker[state_conv[line[2]] + line[1] + yesterday][0]
+        dic = {'date' : int("".join(line[0].split("-"))), 'county' : line[1], 'state' : state_conv[line[2]], 'positive' : int(line[4]), 'death' : int(line[5]), 'deathIncrease' : int(line[5]) - death_prev, 'positiveIncrease' : int(line[4]) - pos_prev}
+        tracker[dic['state'] +dic['county'] + str(dic['date'])] = [dic['positive'], dic['death']]
+        newLis.append(dic)
     return(newLis)
 
 #authenticate MongoDB using credentials in credentials.json and return Client
