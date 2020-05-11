@@ -8,6 +8,7 @@ from datetime import date, timedelta
 import datetime as dt
 import matplotlib.pyplot as plt
 import sys
+import urllib.parse
 
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
@@ -58,7 +59,6 @@ def main():
     db = getDB(credsFile)
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
     pipelines = generate_pipeline(config)
-
     for pipeline in pipelines:
         print(pipeline)
         if config['collection'] == 'states':
@@ -408,9 +408,14 @@ def getDB(credentialFile):
     password = ""
     with open(credentialFile) as f:
         jsonData = json.loads("\n".join(f.readlines()))
+        server = 'localhost'
+        if 'server' in jsonData:
+            server = jsonData['server']
         username = jsonData['username']
-        password = jsonData['password']
-        server = jsonData['server']
+        if (not 'password' in jsonData) or jsonData['password'] == -1:
+            password = input("Password: ")
+        else:
+            password = jsonData['password']
         authDB = jsonData['authDB']
         workDB = jsonData['db']
     client = MongoClient(server,
