@@ -212,11 +212,30 @@ def interpret_output(config, output):
         if("graph" in task["output"].keys()):
             make_graph(task, output, config)
         if("table" in task["output"].keys()):
-            make_table(task)
+            make_table(task, output, config)
 
 
-def make_table(task):
-    pass
+def make_table(task, output, config):
+    rows = get_row_col_values(task["output"]["table"], output, config, "row")
+    cols = get_row_col_values(task["output"]["table"], output, config, "column")
+
+
+def get_row_col_values(table, output, config, key):
+    res = []
+    i = 0
+    for data_point in output:
+        if(table[key] == "time"):
+            res.append(to_datetime(data_point["date"]))
+        elif(table[key] == "state"):
+            if(config["aggregation"] == "state"):
+                res.append(data_point["state"])
+            elif(config["aggregation"] == "usa" or config["aggregation"] == "fiftyStates"):
+                res.append(i) # I dont know if this is correct, spec says "aggregate numbers"
+        elif(table[key] == "county"):
+            res.append(data_point["county"])
+
+
+
 
 
 def make_graph(task, output, config):
