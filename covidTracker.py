@@ -13,8 +13,10 @@ import numpy as np
 import pandas as pd
 import base64
 from io import BytesIO
+from pandas.plotting import register_matplotlib_converters
 
 def main():
+    register_matplotlib_converters()
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
     statesDataURL = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
     credsFile = 'credentials.json'
@@ -28,19 +30,17 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    #db = getDB(credsFile)
-    #refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    #pipelines = generate_pipeline(config)
-    #outputs = []
-    #for pipeline in pipelines:
-    #    print(pipeline)
-    #    if config['collection'] == 'states':
-    #        outputs.append(list(db.states.aggregate(pipeline)))
-    #    else:
-    #        outputs.append(list(db.covid.aggregate(pipeline)))
-    outputs = [[{'positive': 1095681, 'date': 20200501}, {'positive': 1125719, 'date': 20200502}, {'positive': 1152006, 'date': 20200503}, {'positive': 1173453, 'date': 20200504}, {'positive': 1195605, 'date': 20200505}, {'positive': 1220557, 'date': 20200506}, {'positive': 1248137, 'date': 20200507}, {'positive': 1275916, 'date': 20200508}, {'positive': 1301095, 'date': 20200509}, {'positive': 1322807, 'date': 20200510}, {'positive': 1340412, 'date': 20200511}]]
+    db = getDB(credsFile)
+    refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    pipelines = generate_pipeline(config)
+    outputs = []
+    for pipeline in pipelines:
+       print(pipeline)
+       if config['collection'] == 'states':
+           outputs.append(list(db.states.aggregate(pipeline)))
+       else:
+           outputs.append(list(db.covid.aggregate(pipeline)))
     interpret_output(config, outputs, configFile)
-    #print(output)
         
 def generate_pipeline(config):
     pipelines = []
@@ -185,22 +185,27 @@ def interpret_output(config, outputs, configFile):
     html_pages = []
     i = 0
     for task in config["analysis"]:
-        output = outputs[i]
+        if(type(outputs[0]) is list):
+            output = outputs[i]
+        else:
+            output = outputs
         if("graph" in task["output"].keys()):
-            html = make_graph(task, output, config)
-            html = "<html> <body> " + html + " </body> </html>"
+            html = make_graph(task, output, config, configFile)
             html_pages.append(html)
         if("table" in task["output"].keys()):
             html = make_table(task, output, config)
-            html = "<html> <body> " + html + " </body> </html>"
             html_pages.append(html)
         i += 1
-    for html in html_pages:
-        out_file = configFile[:configFile.find(".")] + ".html"
-        if("output" in config.keys()):
+    out_file = configFile[:configFile.find(".")] + ".html"
+    if("output" in config.keys()):
             out_file = config["output"] + ".html"
-        with open(out_file, "w+") as f:
+    with open(out_file, "a+") as f:
+        f.write("<html> <body> ")
+    for html in html_pages:
+        with open(out_file, "a+") as f:
             f.write(html)
+    with open(out_file, "a+") as f:
+        f.write(" </body> </html>")
 
 
 def make_table(task, output, config):
@@ -212,21 +217,24 @@ def make_table(task, output, config):
     for col_value in col_values:
         row_list = []
         for row_value in row_values:
-            for data_point in output:
-                if(row_key == [None] or col_key == [None]):
-                    row_list.append(data_point[output_var])
-                elif(row_key == "stats"):
-                    if(data_point[col_key] == col_value):
-                        row_list.append(data_point[row_value])
-                    else:
-                        continue
-                elif(col_key == "stats"):
-                    if(data_point[row_key] == row_value):
-                        row_list.append(data_point[col_value])
-                    else:
-                        continue
-                elif(data_point[row_key] == row_value and data_point[col_key] == col_value and output_var in data_point.keys()):
-                    row_list.append(data_point[output_var])
+            if(row_key == [None]):
+                row_list.append(output[row_value][output_var])
+            else:
+                for data_point in output:
+                    if(row_key == "stats"):
+                        if(data_point[col_key] == col_value):
+                            row_list.append(data_point[row_value])
+                        else:
+                            continue
+                    elif(col_key == "stats"):
+                        if(data_point[row_key] == row_value):
+                            row_list.append(data_point[col_value])
+                        else:
+                            continue
+                    elif(col_key == [None] and data_point[row_key] == row_value and output_var in data_point.keys()):
+                        row_list.append(data_point[output_var])
+                    elif(data_point[row_key] == row_value and data_point[col_key] == col_value and output_var in data_point.keys()):
+                        row_list.append(data_point[output_var])
         if(len(row_list) > 0):
             table.append(row_list)
         else:
@@ -269,7 +277,7 @@ def get_row_col_values(key, output, config, task):
 
 
 
-def make_graph(task, output, config):
+def make_graph(task, output, config, configFile):
     graph = task["output"]["graph"]
     output_var = get_output_var(task["task"])
     if(graph["type"] == "bar"):
@@ -278,13 +286,10 @@ def make_graph(task, output, config):
         render_plots(output, output_var, config, graph, plt.plot)
     elif(graph["type"] == "scatter"):
         render_plots(output, output_var, config, graph, plt.scatter)
+    tmpfile = configFile[:configFile.find(".")] + ".png"
+    plt.savefig(tmpfile, format='png')
 
-    fig = plt.figure()
-    tmpfile = BytesIO()
-    fig.savefig(tmpfile, format='png')
-    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
-
-    html = '<img src=\'data:image/png;base64,{}\'>'.format(encoded)
+    html = '<img src=\'' + tmpfile + '\'>'
 
     return html
 
@@ -297,13 +302,14 @@ def render_plots(output, output_var, config, graph, plot_func):
     if(graph["combo"] == "separate"):
         make_plots(xlist, ylist, config, graph, output_var, False, plot_func)
     elif(graph["combo"] == "combine"):
+        plt.figure(1, figsize=(12,4))
         make_plots(xlist, ylist, config, graph, output_var, True, plot_func)
     elif(graph["combo"] == "split"):
         xlist_of_3, ylist_of_3 = get_lists_of_3(xlist, ylist)
         i = 0
         offset = 0
         while(i < len(xlist_of_3)):
-            plt.figure(i)
+            plt.figure(i, figsize=(12,4))
             make_plots(xlist_of_3[i], ylist_of_3[i], config, graph, output_var, True, plot_func, offset)
             offset += len(xlist_of_3[i])
             i += 1
@@ -374,7 +380,7 @@ def get_target_type(output):
 
 def plot_xy(plot_func, x, y, graph, output_var, legend_name, figure_num=None):
     if(figure_num is not None):
-        plt.figure(figure_num)
+        plt.figure(figure_num, figsize=(12,4))
     if("title" in graph.keys()):
         plt.suptitle(graph["title"])
     if(legend_name is not None):
