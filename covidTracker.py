@@ -14,8 +14,6 @@ import pandas as pd
 import base64
 from io import BytesIO
 
-
-
 def main():
     covidDataURL = 'https://covidtracking.com/api/v1/states/daily.json'
     statesDataURL = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
@@ -30,16 +28,17 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    db = getDB(credsFile)
-    refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    pipelines = generate_pipeline(config)
-    outputs = []
-    for pipeline in pipelines:
-        print(pipeline)
-        if config['collection'] == 'states':
-            outputs.append(list(db.states.aggregate(pipeline)))
-        else:
-            outputs.append(list(db.covid.aggregate(pipeline)))
+    #db = getDB(credsFile)
+    #refresh(config['refresh'], db,covidDataURL, statesDataURL)
+    #pipelines = generate_pipeline(config)
+    #outputs = []
+    #for pipeline in pipelines:
+    #    print(pipeline)
+    #    if config['collection'] == 'states':
+    #        outputs.append(list(db.states.aggregate(pipeline)))
+    #    else:
+    #        outputs.append(list(db.covid.aggregate(pipeline)))
+    outputs = [[{'positive': 1095681, 'date': 20200501}, {'positive': 1125719, 'date': 20200502}, {'positive': 1152006, 'date': 20200503}, {'positive': 1173453, 'date': 20200504}, {'positive': 1195605, 'date': 20200505}, {'positive': 1220557, 'date': 20200506}, {'positive': 1248137, 'date': 20200507}, {'positive': 1275916, 'date': 20200508}, {'positive': 1301095, 'date': 20200509}, {'positive': 1322807, 'date': 20200510}, {'positive': 1340412, 'date': 20200511}]]
     interpret_output(config, outputs, configFile)
     #print(output)
         
@@ -237,7 +236,6 @@ def make_table(task, output, config):
     table = np.array(table)
     df = pd.DataFrame(table, index=col_values, columns=row_values)
     html = df.to_html()
-    
     return html
 
 
