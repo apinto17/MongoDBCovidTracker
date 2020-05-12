@@ -29,21 +29,72 @@ def main():
         if sys.argv[1] == "-config":    
             configFile = sys.argv[2]
     config = configure(configFile)
-    output = [{"avgdeath": 2316.375,
- "avgpositive": 56168.125,
- "state": "CA",
- "stddeath": 162.41916258557683,
- "stdpositive": 3930.7406883913136},
- {"avgdeath": 19689.75,
- "avgpositive": 319985.625,
- "state": "NY",
- "stddeath": 811.7149669064871,
- "stdpositive": 6927.211775626251},
- {"avgdeath": 845.75,
- "avgpositive": 15293.0,
- "state": "WA",
- "stddeath": 24.468091466234167,
- "stdpositive": 595.0636520574913}]
+    output = [{"date": 20200304, "state": "CA"},
+ {"date": 20200305, "state": "CA"},
+ {"date": 20200306, "state": "CA"},
+ {"date": 20200307, "state": "CA"},
+ {"date": 20200308, "state": "CA"},
+ {"date": 20200309, "state": "CA"},
+ {"date": 20200310, "state": "CA"},
+ {"date": 20200311, "state": "CA"},
+ {"date": 20200312, "death": 4, "state": "CA"},
+ {"date": 20200313, "death": 4, "state": "CA"},
+ {"date": 20200314, "death": 5, "state": "CA"},
+ {"date": 20200315, "death": 5, "state": "CA"},
+ {"date": 20200316, "death": 6, "state": "CA"},
+ {"date": 20200317, "death": 11, "state": "CA"},
+ {"date": 20200318, "death": 13, "state": "CA"},
+ {"date": 20200319, "death": 18, "state": "CA"},
+ {"date": 20200320, "death": 20, "state": "CA"},
+ {"date": 20200321, "death": 24, "state": "CA"},
+ {"date": 20200322, "death": 27, "state": "CA"},
+ {"date": 20200323, "death": 27, "state": "CA"},
+ {"date": 20200324, "death": 40, "state": "CA"},
+ {"date": 20200325, "death": 53, "state": "CA"},
+ {"date": 20200326, "death": 65, "state": "CA"},
+ {"date": 20200327, "death": 78, "state": "CA"},
+ {"date": 20200328, "death": 101, "state": "CA"},
+ {"date": 20200329, "death": 123, "state": "CA"},
+ {"date": 20200330, "death": 133, "state": "CA"},
+ {"date": 20200331, "death": 153, "state": "CA"},
+ {"date": 20200401, "death": 171, "state": "CA"},
+ {"date": 20200402, "death": 203, "state": "CA"},
+ {"date": 20200403, "death": 237, "state": "CA"},
+ {"date": 20200404, "death": 276, "state": "CA"},
+ {"date": 20200405, "death": 319, "state": "CA"},
+ {"date": 20200406, "death": 343, "state": "CA"},
+ {"date": 20200407, "death": 374, "state": "CA"},
+ {"date": 20200408, "death": 442, "state": "CA"},
+ {"date": 20200409, "death": 492, "state": "CA"},
+ {"date": 20200410, "death": 541, "state": "CA"},
+ {"date": 20200411, "death": 609, "state": "CA"},
+ {"date": 20200412, "death": 651, "state": "CA"},
+ {"date": 20200413, "death": 687, "state": "CA"},
+ {"date": 20200414, "death": 758, "state": "CA"},
+ {"date": 20200415, "death": 821, "state": "CA"},
+ {"date": 20200416, "death": 890, "state": "CA"},
+ {"date": 20200417, "death": 985, "state": "CA"},
+ {"date": 20200418, "death": 1072, "state": "CA"},
+ {"date": 20200419, "death": 1166, "state": "CA"},
+ {"date": 20200420, "death": 1208, "state": "CA"},
+ {"date": 20200421, "death": 1268, "state": "CA"},
+ {"date": 20200422, "death": 1354, "state": "CA"},
+ {"date": 20200423, "death": 1469, "state": "CA"},
+ {"date": 20200424, "death": 1562, "state": "CA"},
+ {"date": 20200425, "death": 1651, "state": "CA"},
+ {"date": 20200426, "death": 1710, "state": "CA"},
+ {"date": 20200427, "death": 1755, "state": "CA"},
+ {"date": 20200428, "death": 1809, "state": "CA"},
+ {"date": 20200429, "death": 1887, "state": "CA"},
+ {"date": 20200430, "death": 1982, "state": "CA"},
+ {"date": 20200501, "death": 2073, "state": "CA"},
+ {"date": 20200502, "death": 2171, "state": "CA"},
+ {"date": 20200503, "death": 2215, "state": "CA"},
+ {"date": 20200504, "death": 2254, "state": "CA"},
+ {"date": 20200505, "death": 2317, "state": "CA"},
+ {"date": 20200506, "death": 2412, "state": "CA"},
+ {"date": 20200507, "death": 2504, "state": "CA"},
+ {"date": 20200508, "death": 2585, "state": "CA"}]
     # db = getDB(credsFile)
     # refresh(config['refresh'], db,covidDataURL, statesDataURL)
     # pipelines = generate_pipeline(config)
@@ -55,7 +106,7 @@ def main():
     #     else:
     #         output = (list(db.covid.aggregate(pipeline)))
     # print(output)
-    interpret_output(config, output)
+    interpret_output(config, output, configFile)
         
 #this is where the real work is. Takes in the config file and creates a pipeline based on the contents of said file.
 def generate_pipeline(config):
@@ -197,12 +248,24 @@ def interpret_counties(config):
         return ""
 
 
-def interpret_output(config, output):
+def interpret_output(config, output, configFile):
+    html_pages = []
     for task in config["analysis"]:
-        # if("graph" in task["output"].keys()):
-        #     make_graph(task, output, config)
+        if("graph" in task["output"].keys()):
+            html = make_graph(task, output, config)
+            html = "<html> <body> " + html + " </body> </html>"
+            html_pages.append(html)
         if("table" in task["output"].keys()):
-            make_table(task, output, config)
+            html = make_table(task, output, config)
+            html = "<html> <body> " + html + " </body> </html>"
+            html_pages.append(html)
+
+    for html in html_pages:
+        out_file = configFile[:configFile.find(".")] + ".html"
+        if("output" in config.keys()):
+            out_file = config["output"] + ".html"
+        with open(out_file, "w+") as f:
+            f.write(html)
 
 
 def make_table(task, output, config):
@@ -244,7 +307,8 @@ def make_table(task, output, config):
 
     df = pd.DataFrame(table, index=col_values, columns=row_values)
     html = df.to_html()
-    print(html)
+    
+    return html
 
 
 def get_row_col_values(key, output, config, task):
@@ -293,7 +357,7 @@ def make_graph(task, output, config):
     fig.savefig(tmpfile, format='png')
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
 
-    html = 'Some html head' + '<img src=\'data:image/png;base64,{}\'>'.format(encoded)
+    html = '<img src=\'data:image/png;base64,{}\'>'.format(encoded)
 
     return html
 
