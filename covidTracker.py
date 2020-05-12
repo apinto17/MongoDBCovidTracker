@@ -33,25 +33,15 @@ def main():
     db = getDB(credsFile)
     refresh(config['refresh'], db,covidDataURL, statesDataURL)
     pipelines = generate_pipeline(config)
+    outputs = []
     for pipeline in pipelines:
         print(pipeline)
         if config['collection'] == 'states':
-            output = (list(db.states.aggregate(pipeline)))
+            outputs.append(list(db.states.aggregate(pipeline)))
         else:
-            output = (list(db.covid.aggregate(pipeline)))
-    print(output)
-    # db = getDB(credsFile)
-    # refresh(config['refresh'], db,covidDataURL, statesDataURL)
-    # pipelines = generate_pipeline(config)
-
-    # for pipeline in pipelines:
-    #     print(pipeline)
-    #     if config['collection'] == 'states':
-    #         output = (list(db.states.aggregate(pipeline)))
-    #     else:
-    #         output = (list(db.covid.aggregate(pipeline)))
-    # print(output)
-    interpret_output(config, output, configFile)
+            outputs.append(list(db.covid.aggregate(pipeline)))
+    interpret_output(config, outputs, configFile)
+    #print(output)
         
 def generate_pipeline(config):
     pipelines = []
@@ -192,9 +182,11 @@ def interpret_counties(config):
         return ""
 
 
-def interpret_output(config, output, configFile):
+def interpret_output(config, outputs, configFile):
     html_pages = []
+    i = 0
     for task in config["analysis"]:
+        output = outputs[i]
         if("graph" in task["output"].keys()):
             html = make_graph(task, output, config)
             html = "<html> <body> " + html + " </body> </html>"
@@ -203,7 +195,7 @@ def interpret_output(config, output, configFile):
             html = make_table(task, output, config)
             html = "<html> <body> " + html + " </body> </html>"
             html_pages.append(html)
-
+        i += 1
     for html in html_pages:
         out_file = configFile[:configFile.find(".")] + ".html"
         if("output" in config.keys()):
@@ -215,17 +207,14 @@ def interpret_output(config, output, configFile):
 def make_table(task, output, config):
     row_key, row_values = get_row_col_values(task["output"]["table"]["row"], output, config, task["task"])
     col_key, col_values = get_row_col_values(task["output"]["table"]["column"], output, config, task["task"])
-
     output_var = get_output_var(task["task"])
     table = []
     vals_to_remove = []
-
-
     for col_value in col_values:
         row_list = []
         for row_value in row_values:
             for data_point in output:
-                if(row_key is None or col_key is None):
+                if(row_key == [None] or col_key == [None]):
                     row_list.append(data_point[output_var])
                 elif(row_key == "stats"):
                     if(data_point[col_key] == col_value):
@@ -243,12 +232,9 @@ def make_table(task, output, config):
             table.append(row_list)
         else:
             vals_to_remove.append(col_value)
-
     for val in vals_to_remove:
         col_values.remove(val)
-
     table = np.array(table)
-
     df = pd.DataFrame(table, index=col_values, columns=row_values)
     html = df.to_html()
     
@@ -281,7 +267,6 @@ def get_row_col_values(key, output, config, task):
             res.append("avg" + stat)
             res.append("std" + stat)
         res_key = "stats"
-    
     return res_key, res
 
 
@@ -413,11 +398,20 @@ def report_xy(output, output_var, target=None, target_type=None):
     x = []
     y = []
     for data_point in output:
+        xData = "date"
+        if not xData in data_point:
+            xData = "state"
+        elif not xData in data_point:
+            xData = "county"
+        if xData == "date":
+            xData = to_datetime(data_point[xData])
+        else:
+            xData = data_point[xData]
         if(target is None):
-            x.append(to_datetime(data_point["date"]))
+            x.append(xData)
             y.append(data_point[output_var])
         elif(data_point[target_type] == target):
-            x.append(to_datetime(data_point["date"]))
+            x.append(xData)
             y.append(data_point[output_var])
     return x, y
 
